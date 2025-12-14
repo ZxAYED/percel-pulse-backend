@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String            @id @default(uuid())
+  first_name        String
+  last_name         String
+  phone             String
+  email             String            @unique
+  password          String
+  organisation_name String
+  role              USER_ROLE
+  organisation_role ORGANISATION_ROLE
+  screens           Screen[]          @relation("UserScreens")
+  bundles           Bundle[]          @relation("UserBundles")
+  otp               String?
+  otp_expires_at    DateTime?
+  is_verified       Boolean           @default(false)
+
+  password_reset_otp     String?
+  password_reset_expires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  status USER_STATUS @default(active)
+}
+
+enum USER_STATUS {
+  active
+  blocked
+}
+
+enum USER_ROLE {
+  customer
+  admin
+}
+
+enum ORGANISATION_ROLE {
+  advertiser
+  agency
+}
+
+model Screen {
+  id           String              @id @default(uuid())
+  adminId      String
+  slug         String
+  screen_name  String
+  screen_size  String
+  description  String
+  resolution   String
+  lat          String
+  lng          String
+  img_url      String
+  price        Float
+  duration     String
+  availability SCREEN_AVAILABILITY
+  status       SCREEN_STATUS
+  location     String
+  admin        User                @relation("UserScreens", fields: [adminId], references: [id])
+  bundles      Bundle[]            @relation("BundleScreens")
+}
+
+enum SCREEN_AVAILABILITY {
+  available
+  maintenance
+}
+
+enum SCREEN_STATUS {
+  active
+  occupied
+}
+
+model Bundle {
+  id          String        @id @default(uuid())
+  adminId     String
+  bundle_name String
+  screens     Screen[]      @relation("BundleScreens")
+  img_url     String
+  price       Float
+  duration    String
+  status      BUNDLE_STATUS
+  location    String
+  admin       User          @relation("UserBundles", fields: [adminId], references: [id])
+}
+
+enum BUNDLE_STATUS {
+  ongoing
+  expired
+}
