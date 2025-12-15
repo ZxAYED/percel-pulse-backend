@@ -1,7 +1,7 @@
 import { Request, RequestHandler } from "express";
+import status from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
-import status from "http-status";
 import { UserService } from "./auth.service";
 
 const register: RequestHandler = catchAsync(async (req, res) => {
@@ -65,7 +65,7 @@ const changePassword: RequestHandler = catchAsync(async (req:Request & {user?:an
 
 const loginUser: RequestHandler = catchAsync(async (req, res) => {
   const result = await UserService.loginUser(req.body);
-  const { refreshToken, ...others } = result;
+  const { refreshToken } = result;
 
   res.cookie("refreshToken", refreshToken, {
     secure: process.env.NODE_ENV === "production",
@@ -75,7 +75,7 @@ const loginUser: RequestHandler = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "User Login Successfuly.",
+    message: "User Login Successfully.",
     data: result,
   });
 });
