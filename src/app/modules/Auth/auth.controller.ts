@@ -1,7 +1,7 @@
 import { Request, RequestHandler } from "express";
+import status from "http-status";
 import catchAsync from "../../../shared/catchAsync";
 import sendResponse from "../../../shared/sendResponse";
-import status from "http-status";
 import { UserService } from "./auth.service";
 
 const register: RequestHandler = catchAsync(async (req, res) => {
@@ -10,21 +10,12 @@ const register: RequestHandler = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: status.CREATED,
     success: true,
-    message: "User registered successfully.",
+    message: "Registration successful. OTP sent to your email.",
     data: result,
   });
 });
 
-const createUser: RequestHandler = catchAsync(async (req, res) => {
-  const result = await UserService.createUser(req.body);
 
-  sendResponse(res, {
-    statusCode: status.OK,
-    success: true,
-    message: "User Registration Successfuly. Please verify your email.",
-    data: result,
-  });
-});
 const resendOtp: RequestHandler = catchAsync(async (req, res) => {
   const result = await UserService.resendOtp(req.body.email);
 
@@ -65,12 +56,6 @@ const changePassword: RequestHandler = catchAsync(async (req:Request & {user?:an
 
 const loginUser: RequestHandler = catchAsync(async (req, res) => {
   const result = await UserService.loginUser(req.body);
-  const { refreshToken, ...others } = result;
-
-  res.cookie("refreshToken", refreshToken, {
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: true,
-  });
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -81,10 +66,7 @@ const loginUser: RequestHandler = catchAsync(async (req, res) => {
 });
 
 const refreshToken: RequestHandler = catchAsync(async (req, res) => {
-  const refreshToken = req.cookies.refreshToken; 
-  console.log({ refreshToken });
-
-  const result = await UserService.refreshAccessToken(refreshToken);
+  const result = await UserService.refreshAccessToken("");
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -123,7 +105,7 @@ const resetPassword: RequestHandler = catchAsync(async (req, res) => {
 
 export const UserController = {
   register,
-  createUser,
+ 
   loginUser,
   refreshToken,
   resendOtp,

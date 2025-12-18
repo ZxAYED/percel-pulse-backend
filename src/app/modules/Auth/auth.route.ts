@@ -1,21 +1,34 @@
 import express from "express";
-import { UserController } from "./auth.controller";
 import RoleValidation from "../../middlewares/RoleValidation";
-import { USER_ROLE } from "@prisma/client";
+import validateJSON from "../../middlewares/validateJSON";
+import { UserController } from "./auth.controller";
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  requestResetPasswordSchema,
+  resendOtpSchema,
+  resetPasswordSchema,
+  verifyOtpSchema,
+} from "./auth.validation";
 
 const router = express.Router();
 
-router.post("/register", UserController.register);
-router.post("/create-user", UserController.createUser);
-router.post("/resend-otp", UserController.resendOtp);
-router.post("/verify-otp", UserController.verifyOtp);
-router.post("/login", UserController.loginUser);
+router.post("/register", validateJSON(registerSchema), UserController.register);
+router.post("/resend-otp", validateJSON(resendOtpSchema), UserController.resendOtp);
+router.post("/verify-otp", validateJSON(verifyOtpSchema), UserController.verifyOtp);
+router.post("/login", validateJSON(loginSchema), UserController.loginUser);
 router.post("/refresh-token", UserController.refreshToken);
-router.post("/reset-password", UserController.resetPassword);
-router.post("/request-reset-password", UserController.requestPasswordReset);
+router.post("/reset-password", validateJSON(resetPasswordSchema), UserController.resetPassword);
+router.post(
+  "/request-reset-password",
+  validateJSON(requestResetPasswordSchema),
+  UserController.requestPasswordReset
+);
 router.post(
   "/change-password",
-  RoleValidation(USER_ROLE.customer, USER_ROLE.admin),
+  RoleValidation("CUSTOMER","customer","ADMIN","admin"),
+  validateJSON(changePasswordSchema),
   UserController.changePassword
 );
 

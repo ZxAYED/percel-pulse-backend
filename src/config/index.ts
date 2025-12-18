@@ -10,4 +10,7 @@ export default {
     refresh_token_secret: process.env.REFRESH_TOKEN_SECRET,
     refresh_token_expires_in: process.env.REFRESH_TOKEN_EXPIRES_IN,
   },
+  SendGridAPI: process.env.SENDGRID_API_KEY,
+  SendGridEmail: process.env.SENDGRID_EMAIL,
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
 };

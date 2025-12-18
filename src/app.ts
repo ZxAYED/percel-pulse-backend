@@ -1,15 +1,15 @@
-import express, { Application, NextFunction, Request, Response } from "express";
 import cors from "cors";
+import express, { Application, NextFunction, Request, Response } from "express";
 
-import router from "./app/routes";
+import cookieParser from "cookie-parser";
 import status from "http-status";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
-import cookieParser from "cookie-parser";
+import router from "./app/routes";
 
 const app: Application = express();
 
 app.use(cors({
-  origin: ["https://unnig-couier.vercel.app","http://localhost:5173"],
+  origin: ["","http://localhost:5173"],
   credentials: true,
 }));
 

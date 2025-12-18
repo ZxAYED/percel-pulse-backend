@@ -1,0 +1,20 @@
+import { Role } from "@prisma/client";
+import express from "express";
+import RoleValidation from "../../middlewares/RoleValidation";
+import { CustomerController } from "./customer.controller";
+import validateJSON from "../../middlewares/validateJSON";
+import { bookParcelSchema } from "./customer.validation";
+
+const router = express.Router();
+
+router.post(
+  "/parcels/book",
+  RoleValidation(Role.CUSTOMER),
+  validateJSON(bookParcelSchema),
+  CustomerController.bookParcel
+);
+router.get("/parcels", RoleValidation(Role.CUSTOMER), CustomerController.myParcels);
+router.get("/parcels/:id", RoleValidation(Role.CUSTOMER), CustomerController.parcelDetails);
+router.get("/parcels/:id/track", RoleValidation(Role.CUSTOMER), CustomerController.parcelTracking);
+
+export const CustomerRoutes = router;
