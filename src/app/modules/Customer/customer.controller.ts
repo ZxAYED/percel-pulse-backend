@@ -43,9 +43,20 @@ const parcelTracking = catchAsync(async (req: any, res) => {
   });
 });
 
+const getDashboardMetrics = catchAsync(async (req: any, res) => {
+  const result = await CustomerService.getDashboardMetrics(req.user.id);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Customer dashboard metrics fetched.",
+    data: result,
+  });
+});
+
 export const CustomerController = {
   bookParcel,
   myParcels,
   parcelDetails,
   parcelTracking,
+  getDashboardMetrics,
 };

@@ -10,6 +10,11 @@ import {
 const router = express.Router();
 
 router.get("/parcels", RoleValidation(Role.AGENT), AgentController.getMyParcels);
+router.get(
+  "/dashboard/metrics",
+  RoleValidation(Role.AGENT),
+  AgentController.getDashboardMetrics
+);
 router.post(
   "/update-parcel-status",
   RoleValidation(Role.AGENT),

@@ -1,8 +1,10 @@
-import { ParcelStatus } from "@prisma/client";
+import { ParcelStatus, PaymentStatus, PaymentType } from "@prisma/client";
 import app from "../../../app";
 import { buildDynamicFilters } from "../../../helpers/buildDynamicFilters";
 import { paginationHelper } from "../../../helpers/paginationHelper";
 import prisma from "../../../shared/prisma";
+import { sendParcelStatusUpdateEmail } from "../../../utils/sendParcelNotification";
+import AppError from "../../Errors/AppError";
 
 const AssignedParcelSearchableFields: any = [
   "trackingNumber",
@@ -86,7 +88,7 @@ const updateParcelStatusByAgent = async (payload: {
     select: { agentId: true },
   });
   if (!assignment || assignment.agentId !== payload.agentId) {
-    throw new Error("You are not assigned to this parcel");
+    throw new AppError(403, "You are not assigned to this parcel");
   }
   const targetStatus = String(payload.status).toUpperCase() as keyof typeof ParcelStatus;
   const now = new Date();
@@ -98,10 +100,12 @@ const updateParcelStatusByAgent = async (payload: {
     data: updateData,
     select: {
       id: true,
+      trackingNumber: true,
       status: true,
       deliveredAt: true,
       failedAt: true,
       updatedAt: true,
+      customer: { select: { email: true, name: true } },
     },
   });
   await prisma.parcelStatusHistory.create({
@@ -112,6 +116,17 @@ const updateParcelStatusByAgent = async (payload: {
       remarks: payload.remarks || null,
     },
   });
+  try {
+    if (updated.customer?.email) {
+      await sendParcelStatusUpdateEmail(updated.customer.email, {
+        trackingNumber: updated.trackingNumber,
+        status: String(updated.status),
+        deliveredAt: updated.deliveredAt as any,
+        failedAt: updated.failedAt as any,
+        remarks: payload.remarks || null,
+      });
+    }
+  } catch {}
   return updated;
 };
 
@@ -128,7 +143,7 @@ const recordLocationUpdate = async (payload: {
     select: { agentId: true },
   });
   if (!assignment || assignment.agentId !== payload.agentId) {
-    throw new Error("You are not assigned to this parcel");
+    throw new AppError(403, "You are not assigned to this parcel");
   }
   const point = await prisma.locationTracking.create({
     data: {
@@ -159,8 +174,133 @@ const recordLocationUpdate = async (payload: {
   return point;
 };
 
+const getDashboardMetrics = async (agentId: string) => {
+  const last30 = new Date();
+  last30.setDate(last30.getDate() - 30);
+
+  const next7 = new Date();
+  next7.setDate(next7.getDate() + 7);
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const whereAssigned = {
+    agentAssignment: { agentId },
+  };
+
+  const [
+    totalAssigned,
+    byStatus,
+    assignedToday,
+    deliveredToday,
+    codOutstandingAgg,
+    upcomingPickups,
+    upcomingDeliveries,
+    recentParcels,
+    deliveredLast30,
+  ] = await Promise.all([
+    prisma.parcel.count({ where: whereAssigned }),
+    prisma.parcel.groupBy({
+      by: ["status"],
+      where: whereAssigned,
+      _count: { _all: true },
+    }),
+    prisma.agentAssignment.count({
+      where: { agentId, assignedAt: { gte: startOfToday } },
+    }),
+    prisma.parcel.count({
+      where: {
+        ...whereAssigned,
+        status: ParcelStatus.DELIVERED,
+        deliveredAt: { gte: startOfToday },
+      },
+    }),
+    prisma.parcel.aggregate({
+      where: {
+        ...whereAssigned,
+        paymentType: PaymentType.COD,
+        paymentStatus: PaymentStatus.PENDING,
+        status: { not: ParcelStatus.FAILED },
+      },
+      _sum: { codAmount: true },
+    }),
+    prisma.parcel.count({
+      where: {
+        ...whereAssigned,
+        status: ParcelStatus.BOOKED,
+        expectedPickupAt: { gte: new Date(), lte: next7 },
+      },
+    }),
+    prisma.parcel.count({
+      where: {
+        ...whereAssigned,
+        status: { in: [ParcelStatus.PICKED_UP, ParcelStatus.IN_TRANSIT, ParcelStatus.BOOKED] },
+        expectedDeliveryAt: { gte: new Date(), lte: next7 },
+      },
+    }),
+    prisma.parcel.findMany({
+      where: whereAssigned,
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        trackingNumber: true,
+        status: true,
+        pickupAddress: true,
+        deliveryAddress: true,
+        expectedPickupAt: true,
+        expectedDeliveryAt: true,
+        updatedAt: true,
+        customer: { select: { id: true, name: true, phone: true } },
+        agentAssignment: { select: { assignedAt: true, acceptedAt: true, startedAt: true } },
+      },
+    }),
+    prisma.parcel.findMany({
+      where: { ...whereAssigned, status: ParcelStatus.DELIVERED, deliveredAt: { gte: last30 } },
+      select: { deliveredAt: true },
+    }),
+  ]);
+
+  const countsByStatus: Record<string, number> = {};
+  for (const row of byStatus) {
+    countsByStatus[String(row.status)] = row._count._all;
+  }
+
+  const active =
+    (countsByStatus[ParcelStatus.BOOKED] || 0) +
+    (countsByStatus[ParcelStatus.PICKED_UP] || 0) +
+    (countsByStatus[ParcelStatus.IN_TRANSIT] || 0);
+
+  const deliveredByDay: Record<string, number> = {};
+  for (const p of deliveredLast30) {
+    if (!p.deliveredAt) continue;
+    const d = p.deliveredAt.toISOString().slice(0, 10);
+    deliveredByDay[d] = (deliveredByDay[d] || 0) + 1;
+  }
+
+  return {
+    cards: {
+      totalAssigned,
+      activeAssigned: active,
+      bookedParcels: countsByStatus[ParcelStatus.BOOKED] || 0,
+      pickedUpParcels: countsByStatus[ParcelStatus.PICKED_UP] || 0,
+      inTransitParcels: countsByStatus[ParcelStatus.IN_TRANSIT] || 0,
+      deliveredParcels: countsByStatus[ParcelStatus.DELIVERED] || 0,
+      failedParcels: countsByStatus[ParcelStatus.FAILED] || 0,
+      assignedToday,
+      deliveredToday,
+      codOutstandingAmount: codOutstandingAgg._sum.codAmount || 0,
+      upcomingPickups,
+      upcomingDeliveries,
+    },
+    deliveredByDay,
+    recentParcels,
+  };
+};
+
 export const AgentService = {
   listAssignedParcels,
   updateParcelStatusByAgent,
   recordLocationUpdate,
+  getDashboardMetrics,
 };

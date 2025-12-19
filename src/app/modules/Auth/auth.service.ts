@@ -145,6 +145,11 @@ const loginUser = async (payload: { email: string; password: string }) => {
     throw new AppError(status.UNAUTHORIZED, "Incorrect password");
   }
 
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
   const accessToken = jwtHelpers.generateToken(
     {
       id: user.id,

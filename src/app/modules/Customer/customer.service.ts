@@ -1,8 +1,10 @@
-import { ParcelStatus, PaymentType } from "@prisma/client";
+import { ParcelStatus, PaymentStatus, PaymentType } from "@prisma/client";
 import axios from "axios";
 import { buildDynamicFilters } from "../../../helpers/buildDynamicFilters";
 import { paginationHelper } from "../../../helpers/paginationHelper";
 import prisma from "../../../shared/prisma";
+import { sendParcelBookedEmail } from "../../../utils/sendParcelNotification";
+import { uploadQrPayloadToSupabase } from "../../middlewares/uploadImageToSupabase";
 
 const geocodeAddress = async (address: string) => {
   try {
@@ -39,42 +41,62 @@ const bookParcel = async (
   payload: {
     pickupAddress: string;
     deliveryAddress: string;
+    referenceCode?: string;
     parcelType: string;
     parcelSize: string;
     weightKg?: number;
+    instructions?: string;
     paymentType: "COD" | "PREPAID";
     codAmount?: number;
     expectedPickupAt?: Date | string;
     expectedDeliveryAt?: Date | string;
+    pickupLat?: number;
+    pickupLng?: number;
+    deliveryLat?: number;
+    deliveryLng?: number;
+    barcode?: string;
   }
 ) => {
   const trackingNumber = await generateTrackingNumber();
-  const pickup = await geocodeAddress(payload.pickupAddress);
-  const delivery = await geocodeAddress(payload.deliveryAddress);
+  const hasPickupCoords =
+    typeof payload.pickupLat === "number" && typeof payload.pickupLng === "number";
+  const hasDeliveryCoords =
+    typeof payload.deliveryLat === "number" && typeof payload.deliveryLng === "number";
+  const pickup = hasPickupCoords ? null : await geocodeAddress(payload.pickupAddress);
+  const delivery = hasDeliveryCoords ? null : await geocodeAddress(payload.deliveryAddress);
 
-  const result = await prisma.parcel.create({
+  let result = await prisma.parcel.create({
     data: {
       trackingNumber,
-      referenceCode: undefined,
+      referenceCode: payload.referenceCode ?? null,
       pickupAddress: payload.pickupAddress,
-      pickupLat: pickup?.lat ?? null,
-      pickupLng: pickup?.lng ?? null,
+      pickupLat: hasPickupCoords ? payload.pickupLat! : pickup?.lat ?? null,
+      pickupLng: hasPickupCoords ? payload.pickupLng! : pickup?.lng ?? null,
       deliveryAddress: payload.deliveryAddress,
-      deliveryLat: delivery?.lat ?? null,
-      deliveryLng: delivery?.lng ?? null,
+      deliveryLat: hasDeliveryCoords ? payload.deliveryLat! : delivery?.lat ?? null,
+      deliveryLng: hasDeliveryCoords ? payload.deliveryLng! : delivery?.lng ?? null,
       parcelType: payload.parcelType,
       parcelSize: payload.parcelSize,
       weightKg: payload.weightKg ?? null,
+      instructions: payload.instructions ?? null,
       paymentType:
         payload.paymentType === "COD" ? PaymentType.COD : PaymentType.PREPAID,
       codAmount: payload.paymentType === "COD" ? payload.codAmount ?? 0 : null,
       status: ParcelStatus.BOOKED,
+      statusHistory: {
+        create: {
+          status: ParcelStatus.BOOKED,
+          remarks: "Parcel booked",
+          updatedById: customerId,
+        },
+      },
       expectedPickupAt: payload.expectedPickupAt
         ? new Date(payload.expectedPickupAt)
         : null,
       expectedDeliveryAt: payload.expectedDeliveryAt
         ? new Date(payload.expectedDeliveryAt)
         : null,
+      barcode: payload.barcode ?? null,
       customerId,
     },
     select: {
@@ -91,9 +113,54 @@ const bookParcel = async (
       status: true,
       expectedPickupAt: true,
       expectedDeliveryAt: true,
+      qrCodeUrl: true,
       createdAt: true,
     },
   });
+  try {
+    const baseUrl = (process.env.FRONTEND_BASE_URL || "http://localhost:5173").replace(
+      /\/$/,
+      ""
+    );
+    const qrPayload = `${baseUrl}/customer/parcels/${result.id}`;
+    const uploaded = await uploadQrPayloadToSupabase(qrPayload, result.trackingNumber);
+    result = await prisma.parcel.update({
+      where: { id: result.id },
+      data: { qrCodeUrl: uploaded.url },
+      select: {
+        id: true,
+        trackingNumber: true,
+        pickupAddress: true,
+        deliveryAddress: true,
+        parcelType: true,
+        parcelSize: true,
+        weightKg: true,
+        paymentType: true,
+        paymentStatus: true,
+        codAmount: true,
+        status: true,
+        expectedPickupAt: true,
+        expectedDeliveryAt: true,
+        qrCodeUrl: true,
+        createdAt: true,
+      },
+    });
+  } catch {}
+  try {
+    const customer = await prisma.user.findUnique({
+      where: { id: customerId },
+      select: { email: true, name: true },
+    });
+    if (customer?.email) {
+      await sendParcelBookedEmail(customer.email, {
+        trackingNumber: result.trackingNumber,
+        pickupAddress: result.pickupAddress,
+        deliveryAddress: result.deliveryAddress,
+        expectedPickupAt: result.expectedPickupAt as any,
+        expectedDeliveryAt: result.expectedDeliveryAt as any,
+      });
+    }
+  } catch {}
   return result;
 };
 
@@ -158,10 +225,15 @@ const getParcelById = async (customerId: string, parcelId: string) => {
       trackingNumber: true,
       customerId: true,
       pickupAddress: true,
+      pickupLat: true,
+      pickupLng: true,
       deliveryAddress: true,
+      deliveryLat: true,
+      deliveryLng: true,
       parcelType: true,
       parcelSize: true,
       weightKg: true,
+      instructions: true,
       paymentType: true,
       paymentStatus: true,
       codAmount: true,
@@ -170,6 +242,8 @@ const getParcelById = async (customerId: string, parcelId: string) => {
       expectedDeliveryAt: true,
       deliveredAt: true,
       failedAt: true,
+      qrCodeUrl: true,
+      barcode: true,
       createdAt: true,
       agentAssignment: {
         select: {
@@ -217,9 +291,120 @@ const getParcelTracking = async (customerId: string, parcelId: string) => {
   return { points: locations };
 };
 
+const getDashboardMetrics = async (customerId: string) => {
+  const last30 = new Date();
+  last30.setDate(last30.getDate() - 30);
+
+  const next7 = new Date();
+  next7.setDate(next7.getDate() + 7);
+
+  const [
+    totalParcels,
+    byStatus,
+    codPendingAgg,
+    prepaidPaidAgg,
+    upcomingPickups,
+    upcomingDeliveries,
+    recentParcels,
+    last30Parcels,
+  ] = await Promise.all([
+    prisma.parcel.count({ where: { customerId } }),
+    prisma.parcel.groupBy({
+      by: ["status"],
+      where: { customerId },
+      _count: { _all: true },
+    }),
+    prisma.parcel.aggregate({
+      where: {
+        customerId,
+        paymentType: PaymentType.COD,
+        paymentStatus: PaymentStatus.PENDING,
+      },
+      _sum: { codAmount: true },
+    }),
+    prisma.parcel.aggregate({
+      where: {
+        customerId,
+        paymentType: PaymentType.PREPAID,
+        paymentStatus: PaymentStatus.PAID,
+      },
+      _count: { _all: true },
+    }),
+    prisma.parcel.count({
+      where: {
+        customerId,
+        status: ParcelStatus.BOOKED,
+        expectedPickupAt: { gte: new Date(), lte: next7 },
+      },
+    }),
+    prisma.parcel.count({
+      where: {
+        customerId,
+        status: { in: [ParcelStatus.BOOKED, ParcelStatus.PICKED_UP, ParcelStatus.IN_TRANSIT] },
+        expectedDeliveryAt: { gte: new Date(), lte: next7 },
+      },
+    }),
+    prisma.parcel.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        trackingNumber: true,
+        pickupAddress: true,
+        deliveryAddress: true,
+        status: true,
+        paymentType: true,
+        paymentStatus: true,
+        codAmount: true,
+        createdAt: true,
+      },
+    }),
+    prisma.parcel.findMany({
+      where: { customerId, createdAt: { gte: last30 } },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  const countsByStatus: Record<string, number> = {};
+  for (const row of byStatus) {
+    countsByStatus[String(row.status)] = row._count._all;
+  }
+
+  const active =
+    (countsByStatus[ParcelStatus.BOOKED] || 0) +
+    (countsByStatus[ParcelStatus.PICKED_UP] || 0) +
+    (countsByStatus[ParcelStatus.IN_TRANSIT] || 0);
+
+  const bookingsByDay: Record<string, number> = {};
+  for (const p of last30Parcels) {
+    const d = p.createdAt.toISOString().slice(0, 10);
+    bookingsByDay[d] = (bookingsByDay[d] || 0) + 1;
+  }
+
+  return {
+    cards: {
+      totalParcels,
+      activeParcels: active,
+      deliveredParcels: countsByStatus[ParcelStatus.DELIVERED] || 0,
+      failedParcels: countsByStatus[ParcelStatus.FAILED] || 0,
+      bookedParcels: countsByStatus[ParcelStatus.BOOKED] || 0,
+      pickedUpParcels: countsByStatus[ParcelStatus.PICKED_UP] || 0,
+      inTransitParcels: countsByStatus[ParcelStatus.IN_TRANSIT] || 0,
+      codPendingAmount: codPendingAgg._sum.codAmount || 0,
+      prepaidPaidCount: prepaidPaidAgg._count._all,
+      upcomingPickups,
+      upcomingDeliveries,
+    },
+    bookingsByDay,
+    recentParcels,
+  };
+};
+
 export const CustomerService = {
   bookParcel,
   listMyParcels,
   getParcelById,
   getParcelTracking,
+  getDashboardMetrics,
 };

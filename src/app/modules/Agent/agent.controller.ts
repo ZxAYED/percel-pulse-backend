@@ -28,7 +28,18 @@ const updateMyParcelStatus = catchAsync(async (req: any, res) => {
   });
 });
 
+const getDashboardMetrics = catchAsync(async (req: any, res) => {
+  const result = await AgentService.getDashboardMetrics(req.user.id);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Agent dashboard metrics fetched.",
+    data: result,
+  });
+});
+
 export const AgentController = {
   getMyParcels,
   updateMyParcelStatus,
+  getDashboardMetrics,
 };

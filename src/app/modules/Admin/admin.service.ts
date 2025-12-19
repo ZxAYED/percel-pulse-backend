@@ -1,39 +1,13 @@
-import { ParcelStatus, PaymentType, Role } from "@prisma/client";
+import { ParcelStatus, PaymentType } from "@prisma/client";
+import status from "http-status";
 import { buildDynamicFilters } from "../../../helpers/buildDynamicFilters";
 import { paginationHelper } from "../../../helpers/paginationHelper";
 import prisma from "../../../shared/prisma";
+import { sendParcelStatusUpdateEmail } from "../../../utils/sendParcelNotification";
+import AppError from "../../Errors/AppError";
 
 const getDashboardMetrics = async () => {
   const totalUsers = await prisma.user.count();
-  const admins = await prisma.user.count({ where: { role: Role.ADMIN } });
-  const customers = await prisma.user.count({ where: { role: Role.CUSTOMER } });
-  const last30 = new Date();
-  last30.setDate(last30.getDate() - 30);
-
-  const recentParcels = await prisma.parcel.findMany({
-    where: { createdAt: { gte: last30 } },
-    select: {
-      createdAt: true,
-      status: true,
-      paymentType: true,
-      codAmount: true,
-    },
-  });
-
-  const bookingsByDay: Record<string, number> = {};
-  const failedByDay: Record<string, number> = {};
-  const codByDay: Record<string, number> = {};
-
-  for (const p of recentParcels) {
-    const d = p.createdAt.toISOString().slice(0, 10);
-    bookingsByDay[d] = (bookingsByDay[d] || 0) + 1;
-    if (p.status === ParcelStatus.FAILED) {
-      failedByDay[d] = (failedByDay[d] || 0) + 1;
-    }
-    if (p.paymentType === PaymentType.COD && typeof p.codAmount === "number") {
-      codByDay[d] = (codByDay[d] || 0) + p.codAmount;
-    }
-  }
 
   const [
     totalParcels,
@@ -53,16 +27,11 @@ const getDashboardMetrics = async () => {
   return {
     totals: {
       users: totalUsers,
-      admins,
-      customers,
       parcels: totalParcels,
       delivered: deliveredParcels,
       failed: failedParcels,
       codTotal: codAgg._sum.codAmount || 0,
     },
-    bookingsByDay,
-    failedByDay,
-    codByDay,
   };
 };
 
@@ -134,19 +103,29 @@ const assignAgent = async (payload: {
     select: { id: true },
   });
   if (!parcel) {
-    throw new Error("Parcel not found");
+    throw new AppError(status.NOT_FOUND, "Parcel not found");
   }
   const agent = await prisma.user.findUnique({
     where: { id: payload.agentId },
-    select: { id: true, role: true, name: true, email: true, phone: true },
+   
   });
   if (!agent || String(agent.role) !== "AGENT") {
-    throw new Error("Agent not found or invalid role");
+    throw new AppError(status.NOT_FOUND, "Agent not found or invalid role");
   }
-  const assignment = await prisma.agentAssignment.upsert({
+
+  const existing = await prisma.agentAssignment.findUnique({
     where: { parcelId: payload.parcelId },
-    update: { agentId: payload.agentId, assignedById: payload.assignedById },
-    create: {
+    select: { agentId: true },
+  });
+  if (existing?.agentId) {
+    if (existing.agentId === payload.agentId) {
+      throw new AppError(status.CONFLICT, "Agent already assigned to this parcel");
+    }
+    throw new AppError(status.CONFLICT, "Parcel already assigned to another agent");
+  }
+
+  const assignment = await prisma.agentAssignment.create({
+    data: {
       parcelId: payload.parcelId,
       agentId: payload.agentId,
       assignedById: payload.assignedById,
@@ -182,10 +161,12 @@ const updateParcelStatus = async (payload: {
     data: updateData,
     select: {
       id: true,
+      trackingNumber: true,
       status: true,
       deliveredAt: true,
       failedAt: true,
       updatedAt: true,
+      customer: { select: { email: true, name: true } },
     },
   });
   await prisma.parcelStatusHistory.create({
@@ -196,6 +177,17 @@ const updateParcelStatus = async (payload: {
       remarks: payload.remarks || null,
     },
   });
+  try {
+    if (updated.customer?.email) {
+      await sendParcelStatusUpdateEmail(updated.customer.email, {
+        trackingNumber: updated.trackingNumber,
+        status: String(updated.status),
+        deliveredAt: updated.deliveredAt as any,
+        failedAt: updated.failedAt as any,
+        remarks: payload.remarks || null,
+      });
+    }
+  } catch {}
   return updated;
 };
 
@@ -333,11 +325,226 @@ const exportUsersCSV = async (options: any) => {
   return csv;
 };
 
+const listUsers = async (options: any) => {
+  const { page, limit, skip, sortBy, sortOrder } =
+    paginationHelper.calculatePagination(options);
+  const whereConditions = buildDynamicFilters(options, ["name", "email", "phone"]);
+  const total = await prisma.user.count({ where: whereConditions });
+  const users = await prisma.user.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy: { [sortBy]: sortOrder },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      isActive: true,
+      isVerified: true,
+      createdAt: true,
+      lastLoginAt: true,
+    },
+  });
+  const meta = {
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+  return { data: users, meta };
+};
+
+const listAssignments = async (options: any) => {
+  const { page, limit, skip } = paginationHelper.calculatePagination(options);
+  const sortBy = options.sortBy || "assignedAt";
+  const sortOrder = "desc";
+
+  const and: any[] = [];
+  if (options.agentId) and.push({ agentId: String(options.agentId) });
+  if (options.parcelId) and.push({ parcelId: String(options.parcelId) });
+
+  if (options.searchTerm?.trim()) {
+    const t = String(options.searchTerm);
+    and.push({
+      OR: [
+        { agent: { name: { contains: t, mode: "insensitive" } } },
+        { agent: { email: { contains: t, mode: "insensitive" } } },
+        { parcel: { trackingNumber: { contains: t, mode: "insensitive" } } },
+        { parcel: { referenceCode: { contains: t, mode: "insensitive" } } },
+        { parcel: { pickupAddress: { contains: t, mode: "insensitive" } } },
+        { parcel: { deliveryAddress: { contains: t, mode: "insensitive" } } },
+      ],
+    });
+  }
+
+  const where = and.length > 0 ? { AND: and } : {};
+
+  const total = await prisma.agentAssignment.count({ where });
+  const rows = await prisma.agentAssignment.findMany({
+    where,
+    skip,
+    take: limit,
+    orderBy: { [sortBy]: sortOrder },
+    select: {
+      id: true,
+      parcelId: true,
+      agentId: true,
+      assignedById: true,
+      assignedAt: true,
+      acceptedAt: true,
+      startedAt: true,
+      completedAt: true,
+      agent: { select: { id: true, name: true, email: true, phone: true } },
+      parcel: {
+        select: {
+          id: true,
+          trackingNumber: true,
+          referenceCode: true,
+          status: true,
+          createdAt: true,
+          pickupAddress: true,
+          deliveryAddress: true,
+        },
+      },
+    },
+  });
+
+  const grouped = await prisma.agentAssignment.groupBy({
+    by: ["agentId"],
+    _count: { _all: true },
+  });
+  const summaryByAgent = grouped
+    .sort((a, b) => (b._count._all ?? 0) - (a._count._all ?? 0))
+    .map((g) => ({ agentId: g.agentId, parcels: g._count._all ?? 0 }));
+
+  const meta = {
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+  return { data: rows, meta, summaryByAgent };
+};
+
+const getSingleParcelForExport = async (payload: {
+  parcelId?: string;
+  trackingNumber?: string;
+}) => {
+  const parcelId = payload.parcelId ? String(payload.parcelId) : "";
+  const trackingNumber = payload.trackingNumber ? String(payload.trackingNumber) : "";
+  if (!parcelId && !trackingNumber) {
+    throw new Error("parcelId or trackingNumber is required");
+  }
+  const parcel = await prisma.parcel.findFirst({
+    where: parcelId ? { id: parcelId } : { trackingNumber },
+    select: {
+      id: true,
+      trackingNumber: true,
+      referenceCode: true,
+      status: true,
+      paymentType: true,
+      paymentStatus: true,
+      codAmount: true,
+      parcelType: true,
+      parcelSize: true,
+      weightKg: true,
+      pickupAddress: true,
+      deliveryAddress: true,
+      expectedPickupAt: true,
+      expectedDeliveryAt: true,
+      deliveredAt: true,
+      failedAt: true,
+      createdAt: true,
+      customer: { select: { name: true, email: true, phone: true } },
+      agentAssignment: {
+        select: {
+          assignedAt: true,
+          acceptedAt: true,
+          agent: { select: { name: true, email: true, phone: true } },
+        },
+      },
+      statusHistory: {
+        select: {
+          status: true,
+          remarks: true,
+          createdAt: true,
+          updatedBy: { select: { name: true, role: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!parcel) throw new Error("Parcel not found");
+  return parcel;
+};
+
+const exportSingleParcelCSV = async (payload: {
+  parcelId?: string;
+  trackingNumber?: string;
+}) => {
+  const p = await getSingleParcelForExport(payload);
+  const header = [
+    "Tracking Number",
+    "Reference",
+    "Status",
+    "Payment Type",
+    "Payment Status",
+    "COD Amount",
+    "Parcel Type",
+    "Parcel Size",
+    "Weight (kg)",
+    "Pickup Address",
+    "Delivery Address",
+    "Expected Pickup",
+    "Expected Delivery",
+    "Delivered At",
+    "Failed At",
+    "Created At",
+    "Customer Name",
+    "Customer Email",
+    "Customer Phone",
+    "Agent Name",
+    "Agent Email",
+    "Agent Phone",
+  ];
+  const row = [
+    escapeCSV(p.trackingNumber),
+    escapeCSV(p.referenceCode),
+    escapeCSV(p.status),
+    escapeCSV(p.paymentType),
+    escapeCSV(p.paymentStatus),
+    escapeCSV(p.codAmount),
+    escapeCSV(p.parcelType),
+    escapeCSV(p.parcelSize),
+    escapeCSV(p.weightKg),
+    escapeCSV(p.pickupAddress),
+    escapeCSV(p.deliveryAddress),
+    escapeCSV(p.expectedPickupAt),
+    escapeCSV(p.expectedDeliveryAt),
+    escapeCSV(p.deliveredAt),
+    escapeCSV(p.failedAt),
+    escapeCSV(p.createdAt),
+    escapeCSV(p.customer?.name),
+    escapeCSV(p.customer?.email),
+    escapeCSV(p.customer?.phone),
+    escapeCSV(p.agentAssignment?.agent?.name),
+    escapeCSV(p.agentAssignment?.agent?.email),
+    escapeCSV(p.agentAssignment?.agent?.phone),
+  ];
+  return [header.join(","), row.join(",")].join("\n");
+};
+
 export const AdminService = {
   getDashboardMetrics,
   listParcels,
+  listUsers,
+  listAssignments,
   assignAgent,
   updateParcelStatus,
   exportParcelsCSV,
+  exportSingleParcelCSV,
+  getSingleParcelForExport,
   exportUsersCSV,
 };

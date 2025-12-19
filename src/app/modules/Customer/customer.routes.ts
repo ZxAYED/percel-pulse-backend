@@ -16,5 +16,10 @@ router.post(
 router.get("/parcels", RoleValidation(Role.CUSTOMER), CustomerController.myParcels);
 router.get("/parcels/:id", RoleValidation(Role.CUSTOMER), CustomerController.parcelDetails);
 router.get("/parcels/:id/track", RoleValidation(Role.CUSTOMER), CustomerController.parcelTracking);
+router.get(
+  "/dashboard/metrics",
+  RoleValidation(Role.CUSTOMER),
+  CustomerController.getDashboardMetrics
+);
 
 export const CustomerRoutes = router;
