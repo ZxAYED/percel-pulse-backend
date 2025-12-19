@@ -60,7 +60,7 @@ const loginUser: RequestHandler = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "User Login Successfuly.",
+    message: "User Login Successfully.",
     data: result,
   });
 });
