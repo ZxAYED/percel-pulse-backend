@@ -9,11 +9,8 @@ import router from "./app/routes";
 const app: Application = express();
 
 app.use(cors({
-<<<<<<< HEAD
+
   origin: ["https://parcel-pulse-service.netlify.app","http://localhost:5173"],
-=======
-  origin: ["","http://localhost:5173"],
->>>>>>> 17f3d7978381f8f080332edd438f622d1360979f
   credentials: true,
 }));
 
