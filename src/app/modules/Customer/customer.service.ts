@@ -291,6 +291,28 @@ const getParcelTracking = async (customerId: string, parcelId: string) => {
   return { points: locations };
 };
 
+const getCurrentParcelLocation = async (customerId: string, parcelId: string) => {
+  const parcel = await prisma.parcel.findUnique({
+    where: { id: parcelId },
+    select: { customerId: true },
+  });
+  if (!parcel || parcel.customerId !== customerId) {
+    throw new Error("Parcel not found");
+  }
+  const point = await prisma.locationTracking.findFirst({
+    where: { parcelId },
+    orderBy: { recordedAt: "desc" },
+    select: {
+      latitude: true,
+      longitude: true,
+      speedKph: true,
+      heading: true,
+      recordedAt: true,
+    },
+  });
+  return { point };
+};
+
 const getDashboardMetrics = async (customerId: string) => {
   const last30 = new Date();
   last30.setDate(last30.getDate() - 30);
@@ -406,5 +428,6 @@ export const CustomerService = {
   listMyParcels,
   getParcelById,
   getParcelTracking,
+  getCurrentParcelLocation,
   getDashboardMetrics,
 };

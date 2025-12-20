@@ -77,6 +77,142 @@ const listAssignedParcels = async (agentId: string, options: any) => {
   return { data: parcels, meta };
 };
 
+const listActiveAssignedParcels = async (agentId: string, options: any) => {
+  const page = Number(options.page) > 0 ? Number(options.page) : 1;
+  const limit = Number(options.limit) > 0 ? Number(options.limit) : 100;
+  const skip = (page - 1) * limit;
+  const sortBy = options.sortBy || "updatedAt";
+  const sortOrder = "desc";
+  const dynamic = buildDynamicFilters(options, AssignedParcelSearchableFields);
+  const whereConditions = {
+    AND: [
+      dynamic,
+      { status: { in: [ParcelStatus.BOOKED, ParcelStatus.PICKED_UP, ParcelStatus.IN_TRANSIT] } },
+      { agentAssignment: { agentId } },
+    ],
+  };
+
+  const total = await prisma.parcel.count({ where: whereConditions });
+  const parcels = await prisma.parcel.findMany({
+    where: whereConditions,
+    skip,
+    take: limit,
+    orderBy: { [sortBy]: sortOrder },
+    select: {
+      id: true,
+      trackingNumber: true,
+      referenceCode: true,
+      pickupAddress: true,
+      pickupLat: true,
+      pickupLng: true,
+      deliveryAddress: true,
+      deliveryLat: true,
+      deliveryLng: true,
+      parcelType: true,
+      parcelSize: true,
+      weightKg: true,
+      paymentType: true,
+      paymentStatus: true,
+      codAmount: true,
+      status: true,
+      expectedPickupAt: true,
+      expectedDeliveryAt: true,
+      deliveredAt: true,
+      failedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      customer: { select: { id: true, name: true, email: true, phone: true } },
+      agentAssignment: {
+        select: {
+          id: true,
+          assignedAt: true,
+          acceptedAt: true,
+          startedAt: true,
+          completedAt: true,
+        },
+      },
+    },
+  });
+
+  const parcelIds = parcels.map((p) => p.id);
+  const latestLocations = parcelIds.length
+    ? await prisma.locationTracking.findMany({
+        where: { parcelId: { in: parcelIds } },
+        orderBy: { recordedAt: "desc" },
+        distinct: ["parcelId"],
+        select: {
+          parcelId: true,
+          latitude: true,
+          longitude: true,
+          speedKph: true,
+          heading: true,
+          recordedAt: true,
+        },
+      })
+    : [];
+  const latestByParcelId = new Map(
+    latestLocations.map((p) => [p.parcelId, p])
+  );
+
+  const data = parcels.map((p) => ({
+    ...p,
+    currentLocation: latestByParcelId.get(p.id) || null,
+  }));
+
+  const summary = {
+    count: total,
+    booked: data.filter((p) => p.status === ParcelStatus.BOOKED).length,
+    pickedUp: data.filter((p) => p.status === ParcelStatus.PICKED_UP).length,
+    inTransit: data.filter((p) => p.status === ParcelStatus.IN_TRANSIT).length,
+  };
+
+  const markers = data.flatMap((p) => {
+    const out: any[] = [];
+    if (typeof p.pickupLat === "number" && typeof p.pickupLng === "number") {
+      out.push({
+        type: "pickup",
+        parcelId: p.id,
+        trackingNumber: p.trackingNumber,
+        status: p.status,
+        latitude: p.pickupLat,
+        longitude: p.pickupLng,
+      });
+    }
+    if (typeof p.deliveryLat === "number" && typeof p.deliveryLng === "number") {
+      out.push({
+        type: "delivery",
+        parcelId: p.id,
+        trackingNumber: p.trackingNumber,
+        status: p.status,
+        latitude: p.deliveryLat,
+        longitude: p.deliveryLng,
+      });
+    }
+    if (p.currentLocation) {
+      out.push({
+        type: "current",
+        parcelId: p.id,
+        trackingNumber: p.trackingNumber,
+        status: p.status,
+        latitude: p.currentLocation.latitude,
+        longitude: p.currentLocation.longitude,
+        recordedAt: p.currentLocation.recordedAt,
+        speedKph: p.currentLocation.speedKph,
+        heading: p.currentLocation.heading,
+      });
+    }
+    return out;
+  });
+
+  const meta = {
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+  return { data, meta, summary, markers };
+};
+
 const updateParcelStatusByAgent = async (payload: {
   agentId: string;
   parcelId: string;
@@ -300,6 +436,7 @@ const getDashboardMetrics = async (agentId: string) => {
 
 export const AgentService = {
   listAssignedParcels,
+  listActiveAssignedParcels,
   updateParcelStatusByAgent,
   recordLocationUpdate,
   getDashboardMetrics,

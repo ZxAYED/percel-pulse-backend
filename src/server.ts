@@ -5,6 +5,7 @@ import app from "./app";
 import { AgentService } from "./app/modules/Agent/agent.service";
 import config from "./config";
 import { jwtHelpers } from "./helpers/jwtHelpers";
+import prisma from "./shared/prisma";
 
 const port = 5000;
 
@@ -80,14 +81,43 @@ async function main() {
       }
 
       if (msg.type === "join") {
-        const roomKey = `parcel:${msg.parcelId}`;
+        const parcelId = String(msg.parcelId || "");
+        if (!parcelId) {
+          ws.send(JSON.stringify({ type: "error", action: "join", message: "parcelId is required" }));
+          return;
+        }
+
+        if (ws.user.role !== "ADMIN") {
+          const parcel = await prisma.parcel.findUnique({
+            where: { id: parcelId },
+            select: {
+              customerId: true,
+              agentAssignment: { select: { agentId: true } },
+            },
+          });
+          if (!parcel) {
+            ws.send(JSON.stringify({ type: "error", action: "join", parcelId, message: "Parcel not found" }));
+            return;
+          }
+
+          const allowed =
+            (ws.user.role === "CUSTOMER" && parcel.customerId === ws.user.id) ||
+            (ws.user.role === "AGENT" && parcel.agentAssignment?.agentId === ws.user.id);
+
+          if (!allowed) {
+            ws.send(JSON.stringify({ type: "error", action: "join", parcelId, message: "Forbidden" }));
+            return;
+          }
+        }
+
+        const roomKey = `parcel:${parcelId}`;
         let set = rooms.get(roomKey);
         if (!set) {
           set = new Set<AuthedWS>();
           rooms.set(roomKey, set);
         }
         set.add(ws);
-        ws.send(JSON.stringify({ type: "join_ok", parcelId: msg.parcelId }));
+        ws.send(JSON.stringify({ type: "join_ok", parcelId }));
         return;
       }
 
@@ -99,6 +129,17 @@ async function main() {
       }
 
       if (msg.type === "agent_location_update") {
+        if (ws.user.role !== "AGENT") {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              action: "agent_location_update",
+              parcelId: msg.parcelId,
+              message: "Forbidden  ",
+            })
+          );
+          return;
+        }
         try {
           const { parcelId, latitude, longitude, speedKph, heading } = msg;
           await AgentService.recordLocationUpdate({

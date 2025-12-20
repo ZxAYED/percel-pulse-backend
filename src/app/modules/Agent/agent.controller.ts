@@ -13,6 +13,16 @@ const getMyParcels = catchAsync(async (req: any, res) => {
   });
 });
 
+const getMyActiveParcels = catchAsync(async (req: any, res) => {
+  const result = await AgentService.listActiveAssignedParcels(req.user.id, req.query);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Active route data fetched.",
+    data: result,
+  });
+});
+
 const updateMyParcelStatus = catchAsync(async (req: any, res) => {
   const result = await AgentService.updateParcelStatusByAgent({
     agentId: req.user.id,
@@ -38,8 +48,27 @@ const getDashboardMetrics = catchAsync(async (req: any, res) => {
   });
 });
 
+const recordLocationUpdate = catchAsync(async (req: any, res) => {
+  const result = await AgentService.recordLocationUpdate({
+    agentId: req.user.id,
+    parcelId: req.body.parcelId,
+    latitude: req.body.latitude,
+    longitude: req.body.longitude,
+    speedKph: req.body.speedKph,
+    heading: req.body.heading,
+  });
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Location updated.",
+    data: result,
+  });
+});
+
 export const AgentController = {
   getMyParcels,
+  getMyActiveParcels,
   updateMyParcelStatus,
   getDashboardMetrics,
+  recordLocationUpdate,
 };

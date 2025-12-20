@@ -17,6 +17,11 @@ router.get("/parcels", RoleValidation(Role.CUSTOMER), CustomerController.myParce
 router.get("/parcels/:id", RoleValidation(Role.CUSTOMER), CustomerController.parcelDetails);
 router.get("/parcels/:id/track", RoleValidation(Role.CUSTOMER), CustomerController.parcelTracking);
 router.get(
+  "/parcels/:id/track/current",
+  RoleValidation(Role.CUSTOMER),
+  CustomerController.currentParcelLocation
+);
+router.get(
   "/dashboard/metrics",
   RoleValidation(Role.CUSTOMER),
   CustomerController.getDashboardMetrics

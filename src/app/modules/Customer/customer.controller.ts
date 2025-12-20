@@ -43,6 +43,16 @@ const parcelTracking = catchAsync(async (req: any, res) => {
   });
 });
 
+const currentParcelLocation = catchAsync(async (req: any, res) => {
+  const result = await CustomerService.getCurrentParcelLocation(req.user.id, req.params.id);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Parcel current location fetched.",
+    data: result,
+  });
+});
+
 const getDashboardMetrics = catchAsync(async (req: any, res) => {
   const result = await CustomerService.getDashboardMetrics(req.user.id);
   sendResponse(res, {
@@ -58,5 +68,6 @@ export const CustomerController = {
   myParcels,
   parcelDetails,
   parcelTracking,
+  currentParcelLocation,
   getDashboardMetrics,
 };
