@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+enum Role {
+  ADMIN
+  CUSTOMER
+  AGENT
+}
+
+enum ParcelStatus {
+  BOOKED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+enum PaymentType {
+  COD
+  PREPAID
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+
+
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        Role
+  phone       String?
+  isActive    Boolean  @default(true)
+  isVerified  Boolean  @default(false)
+  verificationOtp            String?
+  verificationOtpExpiresAt   DateTime?
+  passwordResetOtp           String?
+  passwordResetOtpExpiresAt  DateTime?
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  parcels              Parcel[]              @relation("CustomerParcels")
+  assignments          AgentAssignment[]     @relation("AgentAssignments")
+  assignmentsCreated   AgentAssignment[]     @relation("AssignmentsCreatedBy")
+  statusUpdates        ParcelStatusHistory[]
+  locationUpdates      LocationTracking[]
+}
+
+
+
+model Parcel {
+  id                 String        @id @default(uuid())
+  trackingNumber     String        @unique
+  referenceCode      String?       @unique
+  pickupAddress      String
+  pickupLat          Float?
+  pickupLng          Float?
+  deliveryAddress    String
+  deliveryLat        Float?
+  deliveryLng        Float?
+  parcelType         String
+  parcelSize         String
+  weightKg           Float?
+  instructions       String?
+  paymentType        PaymentType
+  paymentStatus      PaymentStatus @default(PENDING)
+  codAmount          Float?
+  status             ParcelStatus  @default(BOOKED)
+  expectedPickupAt   DateTime?
+  expectedDeliveryAt DateTime?
+  deliveredAt        DateTime?
+  failedAt           DateTime?
+  proofOfPickupUrl   String?
+  proofOfDeliveryUrl String?
+  qrCodeUrl          String?
+  barcode            String?
+
+  // Foreign Keys
+  customerId String
+  customer   User          @relation("CustomerParcels", fields: [customerId], references: [id])
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  // Relations
+  agentAssignment AgentAssignment?
+  statusHistory   ParcelStatusHistory[]
+  locationTrack   LocationTracking[]
+  payments        Payment[]
+
+  @@index([customerId, createdAt], name: "idx_parcel_customer_created")
+  @@index([status], name: "idx_parcel_status")
+}
+
+
+
+model AgentAssignment {
+  id           String   @id @default(uuid())
+  parcelId     String   @unique
+  agentId      String
+  assignedById String?
+
+  assignedAt  DateTime @default(now())
+  acceptedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  parcel     Parcel @relation(fields: [parcelId], references: [id])
+  agent      User   @relation("AgentAssignments", fields: [agentId], references: [id])
+  assignedBy User?  @relation("AssignmentsCreatedBy", fields: [assignedById], references: [id])
+
+  @@index([agentId, assignedAt], name: "idx_assignment_agent_time")
+}
+
+
+
+model ParcelStatusHistory {
+  id          String       @id @default(uuid())
+  parcelId    String
+  status      ParcelStatus
+  updatedById String
+
+  remarks     String?
+  createdAt   DateTime     @default(now())
+
+  parcel    Parcel @relation(fields: [parcelId], references: [id])
+  updatedBy User   @relation(fields: [updatedById], references: [id])
+
+  @@index([parcelId, createdAt], name: "idx_parcel_status_history")
+}
+
+
+
+model LocationTracking {
+  id       String   @id @default(uuid())
+  parcelId String
+  agentId  String
+
+  latitude  Float
+  longitude Float
+  speedKph  Float?
+  heading   Float?
+
+  recordedAt DateTime @default(now())
+
+  parcel Parcel @relation(fields: [parcelId], references: [id])
+  agent  User   @relation(fields: [agentId], references: [id])
+
+  @@index([parcelId, recordedAt], name: "idx_location_parcel_time")
+}
+
+
+model Payment {
+  id            String        @id @default(uuid())
+  parcelId      String
+  amount        Float
+  type          PaymentType
+  status        PaymentStatus @default(PENDING)
+  provider      String?
+  transactionId String?       @unique
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  parcel Parcel @relation(fields: [parcelId], references: [id])
+
+  @@index([parcelId], name: "idx_payment_parcel")
+}

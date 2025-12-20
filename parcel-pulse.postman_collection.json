@@ -1,0 +1,758 @@
+{
+	"info": {
+		"_postman_id": "1434bb49-1809-4061-8762-f41353d8656f",
+		"name": "parcel-pulse",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39781146",
+		"_collection_link": "https://next-level-4-arms-team.postman.co/workspace/Team-Workspace~8e12135a-9505-41ce-8b0f-eb129435841e/collection/39781146-1434bb49-1809-4061-8762-f41353d8656f?action=share&source=collection_link&creator=39781146"
+	},
+	"item": [
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"zzayediqbalofficial@gmail.com\",\r\n  \"password\": \"123456\",\r\n  \"role\": \"ADMIN\",\r\n  \"name\": \"Zayed Iqbal\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/register",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "// {\r\n//   \"email\": \"8a1mx5591w@lnovic.com\",\r\n//   \"password\": \"123456\"\r\n// }\r\n// {\r\n//   \"email\": \"sobana4187@roratu.com\",\r\n//   \"password\": \"123456\"\r\n// }\r\n{\r\n  \"email\": \"retexe3994@naqulu.com\",\r\n  \"password\": \"123456\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/login",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "resend otp",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"retexe3994@naqulu.com\",\r\n \"otp\":\"\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/resend-otp",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"resend-otp"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "verify otp",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"8a1mx5591w@lnovic.com\",\r\n \"otp\":\"711778\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/verify-otp",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"verify-otp"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "change-password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"oldPassword\": \"OldPass123\", \"newPassword\": \"NewStr0ngPass!\" }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/change-password",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "request-reset-password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"oldPassword\": \"OldPass123\", \"newPassword\": \"NewStr0ngPass!\" }",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/change-password",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "reset-password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{childToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"8a1mx5591w@lnovic.com\",\r\n    \"otp\": \"267794\",\r\n    \"newPassword\": \"123456\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/auth/reset-password",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"auth",
+								"reset-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "agent",
+			"item": [
+				{
+					"name": "parcels",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "update parecel status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{agentToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/agent/update-parcel-status",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"agent",
+								"update-parcel-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "active parcel routes",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{agentToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/agent/parcels/active",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"agent",
+								"parcels",
+								"active"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "admin",
+			"item": [
+				{
+					"name": "parcels",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base-url}}/admin/parcels?status=DELIVERED&searchTerm=Dhaka&page=1&limit=20",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"parcels"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "DELIVERED"
+								},
+								{
+									"key": "searchTerm",
+									"value": "Dhaka"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "metrics",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": []
+				},
+				{
+					"name": "assign agent",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"agentId\": \"uuid-of-agent\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/assign-agent",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"assign-agent"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "update-parcel-status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"FAILED\",\r\n    \"remarks\": \"Receiver not available\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/update-parcel-status",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"update-parcel-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "single parcel csv",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"FAILED\",\r\n    \"remarks\": \"Receiver not available\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/export/parcels/csv",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"export",
+								"parcels",
+								"csv"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "single parcel pdf",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"FAILED\",\r\n    \"remarks\": \"Receiver not available\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/export/parcels/pdf",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"export",
+								"parcels",
+								"pdf"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "all user csv",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"FAILED\",\r\n    \"remarks\": \"Receiver not available\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/export/parcels/pdf",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"export",
+								"parcels",
+								"pdf"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "all user pdf",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{adminToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"FAILED\",\r\n    \"remarks\": \"Receiver not available\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/admin/export/users/pdf",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"admin",
+								"export",
+								"users",
+								"pdf"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "customer",
+			"item": [
+				{
+					"name": "book parcel",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{customerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/customer/parcels/book",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"customer",
+								"parcels",
+								"book"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get percel",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{customerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/customer/parcels",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"customer",
+								"parcels"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "track",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{agentToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/agent/update-parcel-status",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"agent",
+								"update-parcel-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "single parcel",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "{{customerToken}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"parcelId\": \"uuid-of-parcel\",\r\n    \"status\": \"PICKED_UP\",\r\n    \"remarks\": \"Collected from customer\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base-url}}/customer/parcels/:id",
+							"host": [
+								"{{base-url}}"
+							],
+							"path": [
+								"customer",
+								"parcels",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "894dc596-5807-46ac-8cf6-d40f4cb49eba"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "websocket",
+			"item": []
+		}
+	]
+}
