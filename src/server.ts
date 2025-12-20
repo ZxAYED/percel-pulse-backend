@@ -36,6 +36,7 @@ async function main() {
   ) => {
     const roomKey = `parcel:${parcelId}`;
     const clients = rooms.get(roomKey);
+    console.log("🚀 ~ broadcastParcelLocation ~ clients:", clients)
     if (!clients) return;
     const message = JSON.stringify({ type: "parcel_location", ...payload });
     clients.forEach((client) => {
